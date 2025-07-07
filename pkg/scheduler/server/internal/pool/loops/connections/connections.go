@@ -23,6 +23,7 @@ import (
 	"github.com/diagridio/go-etcd-cron/api"
 
 	schedulerv1pb "github.com/dapr/dapr/pkg/proto/scheduler/v1"
+	"github.com/dapr/dapr/pkg/scheduler/monitoring"
 	"github.com/dapr/dapr/pkg/scheduler/server/internal/pool/loops"
 	"github.com/dapr/dapr/pkg/scheduler/server/internal/pool/loops/stream"
 	"github.com/dapr/dapr/pkg/scheduler/server/internal/pool/store"
@@ -155,6 +156,7 @@ func (c *connections) handleAdd(ctx context.Context, add *loops.ConnAdd) error {
 func (c *connections) handleTriggerRequest(req *loops.TriggerRequest) {
 	loop, ok := c.getStreamLoop(req.Job.GetMetadata())
 	if !ok {
+		monitoring.RecordJobsUndeliveredCount(req.Job.GetMetadata())
 		req.ResultFn(api.TriggerResponseResult_UNDELIVERABLE)
 		return
 	}

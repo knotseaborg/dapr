@@ -242,12 +242,14 @@ func (c *cron) triggerJob(ctx context.Context, req *api.TriggerRequest) *api.Tri
 	var meta schedulerv1pb.JobMetadata
 	if err := req.GetMetadata().UnmarshalTo(&meta); err != nil {
 		log.Errorf("Error unmarshalling metadata: %s", err)
+		monitoring.RecordJobsUndeliveredCount(&meta)
 		return &api.TriggerResponse{Result: api.TriggerResponseResult_UNDELIVERABLE}
 	}
 
 	idx := strings.LastIndex(req.GetName(), "||")
 	if idx == -1 || len(req.GetName()) <= idx+2 {
 		log.Errorf("Job name is malformed: %s", req.GetName())
+		monitoring.RecordJobsUndeliveredCount(&meta)
 		return &api.TriggerResponse{Result: api.TriggerResponseResult_UNDELIVERABLE}
 	}
 

@@ -31,6 +31,7 @@ import (
 	schedulerv1pb "github.com/dapr/dapr/pkg/proto/scheduler/v1"
 	"github.com/dapr/dapr/pkg/runtime/channels"
 	"github.com/dapr/dapr/pkg/runtime/wfengine"
+	"github.com/dapr/dapr/pkg/scheduler/monitoring"
 	"github.com/dapr/kit/concurrency"
 )
 
@@ -123,6 +124,7 @@ func (s *streamer) handleJob(ctx context.Context, job *schedulerv1pb.WatchJobsRe
 	case *schedulerv1pb.JobTargetMetadata_Job:
 		if err := s.invokeApp(ctx, job); err != nil {
 			log.Errorf("failed to invoke schedule app job: %s", err)
+			monitoring.RecordJobsFailedCount(meta)
 			return schedulerv1pb.WatchJobsRequestResultStatus_FAILED
 		}
 		return schedulerv1pb.WatchJobsRequestResultStatus_SUCCESS
@@ -134,6 +136,7 @@ func (s *streamer) handleJob(ctx context.Context, job *schedulerv1pb.WatchJobsRe
 		}
 
 		if errors.Is(err, context.Canceled) {
+			monitoring.RecordJobsFailedCount(meta)
 			return schedulerv1pb.WatchJobsRequestResultStatus_FAILED
 		}
 
@@ -145,6 +148,7 @@ func (s *streamer) handleJob(ctx context.Context, job *schedulerv1pb.WatchJobsRe
 		// so we need to unwrap it and match on the error message
 		if st, ok := status.FromError(err); ok {
 			if st.Code() == codes.FailedPrecondition {
+				monitoring.RecordJobsFailedCount(meta)
 				return schedulerv1pb.WatchJobsRequestResultStatus_FAILED
 			}
 			if st.Message() == actorerrors.ErrReminderCanceled.Error() {
@@ -153,10 +157,12 @@ func (s *streamer) handleJob(ctx context.Context, job *schedulerv1pb.WatchJobsRe
 		}
 
 		log.Errorf("failed to invoke scheduled actor reminder named: %s due to: %s", job.GetName(), err)
+		monitoring.RecordJobsFailedCount(meta)
 		return schedulerv1pb.WatchJobsRequestResultStatus_FAILED
 
 	default:
 		log.Errorf("Unknown job metadata type: %+v", t)
+		monitoring.RecordJobsFailedCount(meta)
 		return schedulerv1pb.WatchJobsRequestResultStatus_FAILED
 	}
 }
